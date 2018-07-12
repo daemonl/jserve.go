@@ -27,6 +27,7 @@ func VersionMiddleware(appName, version string) func(http.Handler) http.Handler 
 func UpHandler(appName, version string) http.Handler {
 	boot := time.Now()
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		rw.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(rw).Encode(map[string]interface{}{
 			"application": appName,
 			"version":     version,
@@ -38,6 +39,8 @@ func UpHandler(appName, version string) http.Handler {
 
 func NotFoundHandler() http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		rw.Header().Set("Content-Type", "application/json")
+		rw.WriteHeader(404)
 		json.NewEncoder(rw).Encode(map[string]interface{}{
 			"status": "Not Found",
 			"path":   req.URL.Path,
