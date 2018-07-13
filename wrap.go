@@ -27,10 +27,13 @@ func Wrap(handler func(*http.Request) (interface{}, error)) http.Handler {
 		if err != nil {
 			userError, ok := err.(UserError)
 			if !ok {
-				logger.FromContext(req.Context()).WithField("error", err.Error()).
+				entry := logger.FromContext(req.Context())
+				entry.WithField("error", err.Error()).
 					Error("Unhandled server error")
 				rw.WriteHeader(500)
-				rw.Write([]byte(`{"error":"Unknown Server Error"}`))
+				if _, err := rw.Write([]byte(`{"error":"Unknown Server Error"}`)); err != nil {
+					entry.WithField("error", err.Error()).Error("Writing Resp")
+				}
 				return
 			}
 			rw.WriteHeader(userError.HTTPStatus())
@@ -40,6 +43,11 @@ func Wrap(handler func(*http.Request) (interface{}, error)) http.Handler {
 
 		if handlerResponse, ok := response.(http.Handler); ok {
 			handlerResponse.ServeHTTP(rw, req)
+			return
+		}
+
+		if response == nil {
+			rw.WriteHeader(http.StatusNoContent)
 			return
 		}
 
