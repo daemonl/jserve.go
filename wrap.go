@@ -25,36 +25,45 @@ func Wrap(handler func(*http.Request) (interface{}, error)) http.Handler {
 		response, err := handler(req)
 
 		if err != nil {
-			userError, ok := err.(UserError)
-			if !ok {
-				entry := logger.FromContext(req.Context())
-				entry.WithField("error", err.Error()).
-					Error("Unhandled server error")
-				rw.WriteHeader(500)
-				if _, err := rw.Write([]byte(`{"error":"Unknown Server Error"}`)); err != nil {
-					entry.WithField("error", err.Error()).Error("Writing Resp")
-				}
-				return
-			}
-			rw.WriteHeader(userError.HTTPStatus())
-			json.NewEncoder(rw).Encode(userError.ResponseObject())
-			return
+			SendError(rw, req, err)
+		} else {
+			SendObject(rw, req, 200, response)
 		}
-
-		if handlerResponse, ok := response.(http.Handler); ok {
-			handlerResponse.ServeHTTP(rw, req)
-			return
-		}
-
-		if response == nil {
-			rw.WriteHeader(http.StatusNoContent)
-			return
-		}
-
-		rw.WriteHeader(200)
-		json.NewEncoder(rw).Encode(response)
 	})
+}
 
+func SendError(rw http.ResponseWriter, req *http.Request, err error) {
+	userError, ok := err.(UserError)
+	if !ok {
+		entry := logger.FromContext(req.Context())
+		entry.WithField("error", err.Error()).
+			Error("Unhandled server error")
+		rw.WriteHeader(500)
+		if _, err := rw.Write([]byte(`{"error":"Unknown Server Error"}`)); err != nil {
+			entry.WithField("error", err.Error()).Error("Writing Resp")
+		}
+		return
+	}
+	rw.WriteHeader(userError.HTTPStatus())
+	json.NewEncoder(rw).Encode(userError.ResponseObject())
+	return
+
+}
+
+func SendObject(rw http.ResponseWriter, req *http.Request, status int, response interface{}) {
+
+	if handlerResponse, ok := response.(http.Handler); ok {
+		handlerResponse.ServeHTTP(rw, req)
+		return
+	}
+
+	if response == nil {
+		rw.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	rw.WriteHeader(status)
+	json.NewEncoder(rw).Encode(response)
 }
 
 type simpleError struct {
